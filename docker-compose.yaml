@@ -1,0 +1,64 @@
+services:
+
+  mongodb:
+    image: mongo:8.0
+    container_name: trongmongodb
+
+    ports:
+      - "27017:27017"
+
+    volumes:
+      - mongodb_data:/data/db
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping').ok"
+        ]
+
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+
+  product-api:
+    build:
+      context: .
+
+    container_name: product-api
+
+    ports:
+      - "${PORT:-3000}:3000"
+
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://mongodb:27017/${MONGO_DB:-productdb}
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"
+        ]
+
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    restart: unless-stopped
+
+
+volumes:
+  mongodb_data:
